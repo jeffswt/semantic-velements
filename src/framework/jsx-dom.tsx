@@ -1,34 +1,79 @@
-import { Fragment } from "react";
+import React, { Fragment } from "react";
 import { Maybe } from "./types";
 
-/** Extract children of JSX element, disregarding fragments. */
-export function childrenOf(elem: JSX.Element): JSX.Element[] {
+/** A non-iterable React node. */
+export type DomNode =
+  | React.ReactElement
+  | string
+  | number
+  | React.ReactPortal
+  | boolean
+  | null
+  | undefined;
+
+type DomElement = React.ReactElement;
+
+/** Check whether an element is generated from a given function. */
+export function elementIs<P = {}>(
+  elem: DomNode,
+  component: React.ComponentType<P>
+): boolean {
+  return (elem as Maybe<DomElement>)?.type === component;
+}
+
+/** Extract children element, Fragments are automatically flattened. */
+export function childrenOf(elem: DomNode): DomNode[] {
   const directChildren = directChildrenOf(elem);
-  const children: JSX.Element[] = [];
+  const children: DomNode[] = [];
   for (const child of directChildren)
-    if (child.type !== Fragment) {
-      children.push(child);
-    } else {
+    if (Array.isArray(child)) {
+      for (const descendant of child) children.push(descendant);
+    } else if (child.type === Fragment) {
       for (const descendant of childrenOf(child)) children.push(descendant);
+    } else {
+      children.push(child);
     }
   return children;
 }
 
-/** Extract children of JSX element exactly as defined in the code. */
-export function directChildrenOf(elem: JSX.Element): JSX.Element[] {
-  const props = elem.props as Maybe<Record<string, unknown>>;
+/** Extract *element* children from parent node. */
+export function directChildrenOf(elem: DomNode): (DomElement | DomNode[])[] {
+  const props = (elem as Maybe<DomElement>)?.props as Maybe<Record<string, unknown>>;
   if (!props?.children) return [];
-  const children = props.children as JSX.Element[];
-  return children.filter((child) => child.type);
+  // the 'React.ReactNode' may be not iterable
+  let children: DomNode[];
+  if (Array.isArray(props.children)) {
+    children = props.children;
+  } else {
+    children = [props.children as DomNode];
+  }
+  // only those with a element signature, or is a fragment may be kept.
+  const result: (DomElement | DomNode[])[] = [];
+  for (const child of children)
+    if ((child as DomElement).type) {
+      result.push(child as DomElement);
+    } else if (Array.isArray(child)) {
+      result.push(child as DomNode[]);
+    }
+  return result;
 }
 
 /** Change the children element definition list to a new one. */
 export function setDirectChildrenOf(
-  elem: JSX.Element,
+  elem: DomNode,
   children: JSX.Element[]
 ): void {
-  const props = elem.props as Maybe<Record<string, unknown>>;
-  if (!props?.type) return; // not safe
-  props.children = children.slice();
+  if (!(elem as Maybe<DomElement>)?.type) return;
+  const theElem = elem as DomElement;
+  const props = theElem.props as Maybe<Record<string, unknown>>;
+  theElem.props = {
+    ...props,
+    children: children.slice(),
+  };
   return;
+}
+
+/** Throws a 'SemanticElement' parser error. */
+export function throwSemError(message: string): never {
+  throw Error(message);
 }
