@@ -11,7 +11,7 @@ export type DomNode =
   | null
   | undefined;
 
-type DomElement = React.ReactElement;
+type DomElement<P = {}> = React.ReactElement<P>;
 
 /** Check whether an element is generated from a given function. */
 export function elementIs<P = {}>(
@@ -21,13 +21,27 @@ export function elementIs<P = {}>(
   return (elem as Maybe<DomElement>)?.type === component;
 }
 
-/** Extract children element, Fragments are automatically flattened. */
-export function childrenOf(elem: DomNode): DomNode[] {
+/** Extract children element matching a given component. */
+export function typedChildrenOf<P = {}>(
+  elem: DomNode,
+  component: React.ComponentType<P>
+): DomElement<P>[] {
+  const children: DomElement<P>[] = [];
+  for (const child of childrenOf(elem))
+    if ((child as DomElement)?.type === component)
+      children.push(child as DomElement<P>);
+  return children;
+}
+
+/** Extract *element* children, where Fragments are automatically flattened. */
+export function childrenOf(elem: DomNode): DomElement[] {
   const directChildren = directChildrenOf(elem);
-  const children: DomNode[] = [];
+  const children: DomElement[] = [];
   for (const child of directChildren)
     if (Array.isArray(child)) {
-      for (const descendant of child) children.push(descendant);
+      for (const grandchild of child)
+        for (const descendant of childrenOf(grandchild))
+          children.push(descendant);
     } else if (child.type === Fragment) {
       for (const descendant of childrenOf(child)) children.push(descendant);
     } else {
@@ -38,7 +52,9 @@ export function childrenOf(elem: DomNode): DomNode[] {
 
 /** Extract *element* children from parent node. */
 export function directChildrenOf(elem: DomNode): (DomElement | DomNode[])[] {
-  const props = (elem as Maybe<DomElement>)?.props as Maybe<Record<string, unknown>>;
+  const props = (elem as Maybe<DomElement>)?.props as Maybe<
+    Record<string, unknown>
+  >;
   if (!props?.children) return [];
   // the 'React.ReactNode' may be not iterable
   let children: DomNode[];
@@ -50,7 +66,7 @@ export function directChildrenOf(elem: DomNode): (DomElement | DomNode[])[] {
   // only those with a element signature, or is a fragment may be kept.
   const result: (DomElement | DomNode[])[] = [];
   for (const child of children)
-    if ((child as DomElement).type) {
+    if ((child as Maybe<DomElement>)?.type) {
       result.push(child as DomElement);
     } else if (Array.isArray(child)) {
       result.push(child as DomNode[]);
