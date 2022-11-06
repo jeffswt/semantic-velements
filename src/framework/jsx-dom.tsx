@@ -1,5 +1,5 @@
 import React, { Fragment } from "react";
-import { Maybe } from "./types";
+import { Dict, Maybe } from "./types";
 
 /** A non-iterable React node. */
 export type DomNode =
@@ -15,11 +15,20 @@ export type DomNode =
 export type DomElement<P = {}> = React.ReactElement<P>;
 
 /**
- * Chesk whether a DOM node is generated from a given component. If the element
+ * Check whether a DOM node is an element. Returns the element verbatim if
+ * it is, or {undefined} otherwise (is not).
+ */
+export function ofAnyComponent(elem: DomNode): Maybe<DomElement> {
+  if ((elem as Maybe<DomElement>)?.type) return elem as DomElement;
+  return undefined;
+}
+
+/**
+ * Check whether a DOM node is generated from a given component. If the element
  * is an instance of the component, the element itself is returned. Otherwise
  * will yield {undefined}.
  */
-export function isComponent<P = {}>(
+export function ofComponent<P = {}>(
   elem: DomNode,
   component: React.ComponentType<P>
 ): Maybe<DomElement<P>> {
@@ -61,7 +70,7 @@ export function directChildrenOf(elem: DomNode): (DomElement | DomNode[])[] {
     for (const child of elem) children.push(child);
   } else if ((elem as Maybe<DomElement>)?.type) {
     const theElem = elem as Maybe<DomElement>;
-    const props = theElem?.props as Maybe<Record<string, unknown>>;
+    const props = theElem?.props as Maybe<Dict<string, unknown>>;
     const chs = props?.children as Maybe<DomNode[] | DomNode>;
     // may be a single element
     if (Array.isArray(chs)) {
@@ -90,7 +99,7 @@ export function setDirectChildrenOf(
 ): void {
   if (!(elem as Maybe<DomElement>)?.type) return;
   const theElem = elem as DomElement;
-  const props = theElem.props as Maybe<Record<string, unknown>>;
+  const props = theElem.props as Maybe<Dict<string, unknown>>;
   theElem.props = {
     ...props,
     children: children.slice(),
