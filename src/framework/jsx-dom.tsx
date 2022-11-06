@@ -9,16 +9,23 @@ export type DomNode =
   | React.ReactPortal
   | boolean
   | null
-  | undefined;
+  | undefined
+  | DomNode[];
 
-type DomElement<P = {}> = React.ReactElement<P>;
+export type DomElement<P = {}> = React.ReactElement<P>;
 
-/** Check whether an element is generated from a given function. */
-export function elementIs<P = {}>(
+/**
+ * Chesk whether a DOM node is generated from a given component. If the element
+ * is an instance of the component, the element itself is returned. Otherwise
+ * will yield {undefined}.
+ */
+export function isComponent<P = {}>(
   elem: DomNode,
   component: React.ComponentType<P>
-): boolean {
-  return (elem as Maybe<DomElement>)?.type === component;
+): Maybe<DomElement<P>> {
+  if ((elem as Maybe<DomElement>)?.type === component)
+    return elem as DomElement<P>;
+  return undefined;
 }
 
 /** Extract children element matching a given component. */
@@ -38,12 +45,8 @@ export function childrenOf(elem: DomNode): DomElement[] {
   const directChildren = directChildrenOf(elem);
   const children: DomElement[] = [];
   for (const child of directChildren)
-    if (Array.isArray(child)) {
-      for (const grandchild of child)
-        for (const descendant of childrenOf(grandchild))
-          children.push(descendant);
-    } else if (child.type === Fragment) {
-      for (const descendant of childrenOf(child)) children.push(descendant);
+    if (Array.isArray(child) || child.type === Fragment) {
+      for (const elem of childrenOf(child)) children.push(elem);
     } else {
       children.push(child);
     }
@@ -52,18 +55,24 @@ export function childrenOf(elem: DomNode): DomElement[] {
 
 /** Extract *element* children from parent node. */
 export function directChildrenOf(elem: DomNode): (DomElement | DomNode[])[] {
-  const props = (elem as Maybe<DomElement>)?.props as Maybe<
-    Record<string, unknown>
-  >;
-  if (!props?.children) return [];
-  // the 'React.ReactNode' may be not iterable
-  let children: DomNode[];
-  if (Array.isArray(props.children)) {
-    children = props.children;
-  } else {
-    children = [props.children as DomNode];
+  // extract all children nodes
+  const children: DomNode[] = [];
+  if (Array.isArray(elem)) {
+    for (const child of elem) children.push(child);
+  } else if ((elem as Maybe<DomElement>)?.type) {
+    const theElem = elem as Maybe<DomElement>;
+    const props = theElem?.props as Maybe<Record<string, unknown>>;
+    const chs = props?.children as Maybe<DomNode[] | DomNode>;
+    // may be a single element
+    if (Array.isArray(chs)) {
+      for (const ch of chs) children.push(ch);
+    } else {
+      children.push(chs);
+    }
   }
-  // only those with a element signature, or is a fragment may be kept.
+
+  if (children.length <= 0) return [];
+  // filter children with element signatures or fragment signatures
   const result: (DomElement | DomNode[])[] = [];
   for (const child of children)
     if ((child as Maybe<DomElement>)?.type) {
