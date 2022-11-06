@@ -19,10 +19,12 @@ export function SemanticPortal(props: ISemanticPortalProps): JSX.Element {
   return <Fragment>{props.children}</Fragment>;
 }
 
-interface IStructureProps {
+export interface IStructureProps {
   /**
-   * A component tree composed entirely of {SemanticElement}s. These elements
-   * **must** have {key}s on their properties to match that in the {Layout}.
+   * A component tree composed entirely of {SemanticElement}s. These semantic
+   * elements **must** have {key}s on their properties to match exactly 1
+   * element (preferably an {Anchor} if you wish not to write the props again)
+   * of the same key in the {Layout}.
    */
   children?: React.ReactNode;
 }
@@ -31,7 +33,7 @@ export function Structure(props: IStructureProps): JSX.Element {
   return <Fragment>{props.children}</Fragment>;
 }
 
-interface ILayoutProps {
+export interface ILayoutProps {
   /** Rule to match this layout. */
   rule: string;
 
@@ -47,4 +49,13 @@ interface ILayoutProps {
 
 export function Layout(props: ILayoutProps): JSX.Element {
   return <Fragment>{props.children}</Fragment>;
+}
+
+interface IAnchorProps {
+  key: string;
+}
+
+/** Dummy element to connect a {Layout} location with a {Structure} node. */
+export function Anchor(props: IAnchorProps): JSX.Element {
+  return <Fragment />
 }
