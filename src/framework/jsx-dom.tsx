@@ -51,7 +51,7 @@ export function typedChildrenOf<P = {}>(
 
 /** Extract *element* children, where Fragments are automatically flattened. */
 export function childrenOf(elem: DomNode): DomElement[] {
-  const directChildren = directChildrenOf(elem);
+  const directChildren = pickPotentialElements(directChildrenOf(elem));
   const children: DomElement[] = [];
   for (const child of directChildren)
     if (Array.isArray(child) || child.type === Fragment) {
@@ -62,10 +62,10 @@ export function childrenOf(elem: DomNode): DomElement[] {
   return children;
 }
 
-/** Extract *element* children from parent node. */
-export function directChildrenOf(elem: DomNode): (DomElement | DomNode[])[] {
-  // extract all children nodes
+/** Extract all children from parent node. */
+export function directChildrenOf(elem: DomNode): DomNode[] {
   const children: DomNode[] = [];
+  // extract all children nodes
   if (Array.isArray(elem)) {
     for (const child of elem) children.push(child);
   } else if ((elem as Maybe<DomElement>)?.type) {
@@ -79,32 +79,22 @@ export function directChildrenOf(elem: DomNode): (DomElement | DomNode[])[] {
       children.push(chs);
     }
   }
-
-  if (children.length <= 0) return [];
-  // filter children with element signatures or fragment signatures
-  const result: (DomElement | DomNode[])[] = [];
-  for (const child of children)
-    if ((child as Maybe<DomElement>)?.type) {
-      result.push(child as DomElement);
-    } else if (Array.isArray(child)) {
-      result.push(child as DomNode[]);
-    }
-  return result;
+  return children;
 }
 
-/** Change the children element definition list to a new one. */
-export function setDirectChildrenOf(
-  elem: DomNode,
-  children: JSX.Element[]
-): void {
-  if (!(elem as Maybe<DomElement>)?.type) return;
-  const theElem = elem as DomElement;
-  const props = theElem.props as Maybe<Dict<string, unknown>>;
-  theElem.props = {
-    ...props,
-    children: children.slice(),
-  };
-  return;
+/** Filter only elements and fragments from node list. */
+export function pickPotentialElements(
+  nodes: DomNode[]
+): (DomElement | DomNode[])[] {
+  // filter children with element signatures or fragment signatures
+  const result: (DomElement | DomNode[])[] = [];
+  for (const node of nodes)
+    if ((node as Maybe<DomElement>)?.type) {
+      result.push(node as DomElement);
+    } else if (Array.isArray(node)) {
+      result.push(node as DomNode[]);
+    }
+  return result;
 }
 
 /** Throws a 'SemanticElement' parser error. */
