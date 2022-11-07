@@ -1,5 +1,6 @@
 import {
   childrenOf,
+  directChildrenOf,
   DomElement,
   DomNode,
   ofAnyComponent,
@@ -148,5 +149,56 @@ function parseLayout(elem: DomElement<ILayoutProps>): ParsedLayout {
  *  3. If an {Anchor} in the {Layout} corresponds to a {Structure} node, that
  *     node must be a direct child of the {Structure} root. This means that we
  *     only process direct subtree roots of the {Structure}.
+ *
+ * @note Fragments may be split open during this process, particularly if some
+ *       children of that fragment was connected to a structure node.
  */
-function connectLayout(layout: ParsedLayout): void {}
+function connectLayout(structure: ParsedStructure, layout: ParsedLayout): void {
+  // retrieve keys for root's children
+  const keys: Dict<string, StructureNode> = {};
+  for (const ch of structure.children) keys[ch.key] = ch;
+  // already-matched keys
+  const matched: Dict<string, DomElement> = {};
+
+  // dfs goes through layout recursively to find matching keys, returning
+  // {undefined} if the subtree root is to be kept unchanged, or the newly
+  // created subtree root to replace the old one
+  function dfs(node: DomNode): Maybe<DomNode> {
+    // process current node
+    const elem = ofAnyComponent(node);
+    if (elem) {
+      const props = elem.props as Maybe<Dict<string, unknown>>;
+      const key = props?.key as Maybe<string>;
+      // node matches one of the structure nodes
+      if (key !== undefined && structure.keys[key]) {
+        if (!keys[key]) throwSemError(`layout node '${key}' is too deep`);
+        if (matched[key]) throwSemError(`duplicate layout node '${key}'`);
+        const converted: DomElement = null;
+        // mark key as used
+        matched[key] = converted;
+        return converted;
+      }
+    }
+    // go through children
+    let childrenChanged = false;
+    const newChildren: DomNode[] = [];
+    for (const ch of directChildrenOf(node)) {
+      const newCh = dfs(ch);
+      if (newCh !== undefined) {
+        childrenChanged = true;
+        newChildren.push(newCh);
+      } else {
+        newChildren.push(ch);
+      }
+    }
+    // make changes to children if something's changed
+    if (childrenChanged)
+      if (elem) {
+        const props = elem.props as Dict<string, unknown>; // must have children
+        props.children = newChildren;
+      } else if (Array.isArray(elem)) {
+        return newChildren;
+      }
+    return;
+  }
+}
